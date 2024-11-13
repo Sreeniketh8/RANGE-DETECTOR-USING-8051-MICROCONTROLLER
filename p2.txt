@@ -1,0 +1,132 @@
+/*
+Find distance of an Object by interfacing Ultrasonic HC-SR04 module with 8051(AT89S52)
+*/
+#include<reg52.h>
+#include <stdio.h>
+#include <LCD_8_bit.h>
+#include <math.h>
+#define sound_velocity 34300 /* sound velocity in cm per second */
+#define period_in_us pow(10,-6)
+#define Clock_period 1.085*period_in_us /* period for clock cycle of 8051*/
+sbit Trigger_pin=P2^6; /* Trigger pin */
+sbit Echo_pin=P2^7; /* Echo pin */
+void Delay_us()
+{
+TL0=0xF5;
+TH0=0xFF;
+TR0=1;
+while (TF0==0);
+TR0=0;
+TF0=0;
+}
+void init_timer(){
+TMOD=0x01; /initialize Timer/
+TF0=0;
+TR0 = 0;
+}
+void send_trigger_pulse(){
+Trigger_pin= 1; /* pull trigger pin HIGH */
+Delay_us(); /* provide 10uS Delay*/
+Trigger_pin = 0; /* pull trigger pin LOW*/
+}
+void main()
+{
+float distance_measurement, value;
+unsigned char distance_in_cm[10];
+LCD_Init(); /* Initialize 16x2 LCD */
+LCD_String_xy(1,1,"Distance");
+init_timer(); /* Initialize Timer*/
+while(1)
+{
+send_trigger_pulse()
+while(!Echo_pin); /* Waiting for Echo */
+TR0 = 1; /* Timer Starts */
+while(Echo_pin && !TF0); /* Waiting for Echo goes LOW */
+TR0 = 0; /* Stop the timer */
+/* calculate distance using timer */
+value = Clock_period * sound_velocity;
+distance_measurement = (TL0|(TH0<<8)); /* read timer register for time count */
+distance_measurement = (distance_measurement*value)/2.0; /* find distance(in cm) */
+sprintf(distance_in_cm, "%.2f", distance_measurement);
+LCD_String_xy(2,1,distance_in_cm); /* show distance on 16x2 LCD */
+LCD_String(" cm ");
+delay(100);
+}
+}
+LCD INTERFACING CODE
+/*
+* LCD_8_bit.c
+*
+* http://www.electronicwings.com
+*/
+#include <reg52.h>
+#include <intrins.h>
+#include "LCD_8_BIT.h"
+#define LCD_Data P1
+sbit RS=P2^0;
+sbit RW=P2^1;
+sbit EN=P2^2;
+void delay(unsigned int k)
+{
+int i,j;
+for (i=0;i<k;i++)
+for (j=0;j<112;j++);
+}
+void LCD_Command(char Command)
+{
+LCD_Data = Command;
+RS=0;
+RW=0;
+EN=1;
+delay(1);
+EN=0;
+delay(3);
+}
+void LCD_Char(char Data)
+{
+LCD_Data = Data;
+RS=1;
+RW=0;
+EN=1;
+delay(1);
+EN=0;
+delay(3);
+}
+void LCD_String(unsigned char *str)
+{
+int i;
+for(i=0;str[i]!=0;i++) /* Send each char of string till the NULL */
+{
+LCD_Char (str[i]); /* Call LCD data write */
+}
+}
+void LCD_String_xy (unsigned char row, unsigned char pos, unsigned char str) / Send string to LCD function */
+{
+if (row == 1)
+LCD_Command((pos & 0x0F)|0x80); /* Command of first row and required position<16 */
+else if (row == 2)
+LCD_Command((pos & 0x0F)|0xC0); /* Command of Second row and required position<16 */
+LCD_String(str); /* Call LCD string function */
+}
+void LCD_Init()
+{
+delay(50);
+LCD_Command(0x38);
+LCD_Command(0x0C);
+LCD_Command(0x01);
+LCD_Command(0x06);
+LCD_Command(0x80);
+}
+/*
+* LCD_8_bit.h
+*/
+#ifndef _LCD_8_BIT_H_
+#define _LCD_8_BIT_H_
+#include <reg52.h>
+void delay(unsigned int);
+void LCD_Command(char Command);
+void LCD_Char(char Data);
+void LCD_String(unsigned char *ptr);
+void LCD_String_xy(unsigned char row,unsigned char column, unsigned char *);
+void LCD_Init();
+#endif
